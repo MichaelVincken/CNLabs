@@ -1,4 +1,3 @@
-import java.io.*; 
 import java.net.*; 
 
 
@@ -7,7 +6,13 @@ import java.net.*;
 public class HTTPServer {
 
 	public static void main(String[] args)  throws Exception { 
-		ServerSocket welcomeSocket = new ServerSocket(6789); 
+		if(args.length != 1){
+			throw new IllegalArgumentException("Needs 1 argument: the port number.");
+		}
+		int portNumber = Integer.parseInt(args[0]);
+		ServerSocket welcomeSocket = new ServerSocket(portNumber); 
+		
+		System.out.println("Listening to port " + portNumber +"...");
 		
 		while (true) { 
 			Socket connectionSocket = welcomeSocket.accept();

@@ -9,9 +9,9 @@ public class HTTPClient {
 	private static Pattern urlPattern = Pattern.compile("^(?<domain>[a-zA-Z.]*)(?:\\:(?<port>\\d*))?(?<path>/.*)?");
 	private static Pattern imgPattern = Pattern.compile("<img.+?src=\"(.+?)\"");
 	
-	public static void main(String argv2[]) throws Exception { 
+	public static void main(String argv[]) throws Exception { 
 		
-		String[] argv = {"GET", "www.robgendlerastropics.com/index.htm", "80", "HTTP/1.0"};
+		//String[] argv = {"GET", "www.robgendlerastropics.com/index.htm", "80", "HTTP/1.0"};
 		
 		LinkedList<String> images = new LinkedList<String>();
 		
@@ -31,6 +31,7 @@ public class HTTPClient {
 		DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
 		BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); 
 		
+		System.out.println(argv[0]);
 		String request = createRequest(argv[0],argv[3],parsedUrl);
 		
 		System.out.println("sending..."); 
@@ -82,7 +83,10 @@ public class HTTPClient {
 			req += "Host: " + urlTokenized[0] + ":" + urlTokenized[1] + "\n";
 		}
 		
-		if(command == "PUT" || command == "POST"){
+		System.out.println("we have the command: \"" + command + "\"");
+		
+		if(command.equals("PUT") || command.equals("POST")){
+			System.out.println("we are after the choice...");
 			System.out.println("What data do you want to include? Enter a string below:");
 			String sentence = getUserInput();
 			System.out.println(sentence);
