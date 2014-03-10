@@ -1,13 +1,10 @@
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -58,16 +55,15 @@ public class Handler implements Runnable {
 							+ "Content-Length: 111\n"
 							+ "\n"
 							+ "<html><body>\n"
-							+ "<h2>No Host: header received</h2>"
-							+ "HTTP 1.1 requests must include the Host: header."
-							+ "</body></html>";
+							+ "<h2>No Host: header received</h2>\n"
+							+ "HTTP 1.1 requests must include the Host: header.\n"
+							+ "</body></html>\n\n";
 					outToClient.writeBytes(response);
+					System.out.println("Finished writing");
 					return;
 				}
 			}
 			Path filePath = FileSystems.getDefault().getPath(domain, properties[1]);
-			
-			System.out.println("We zoeken in " + filePath.toString());
 			
 			switch(properties[0]){
 				case "GET":		if(Files.exists(filePath)){
@@ -93,7 +89,7 @@ public class Handler implements Runnable {
 								}
 				case "PUT": ;
 				case "POST": ;
-				default: response = properties[2] + " 501 Not Implemented";
+				default: response = properties[2] + " 501 Not Implemented\n\n";
 			}
 			
 			/*

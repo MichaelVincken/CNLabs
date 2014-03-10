@@ -79,19 +79,17 @@ public class HTTPClient {
 	private static String createRequest(String command, String httpVersion, String[] urlTokenized) {
 		
 		String req = command + " " + urlTokenized[2] + " " + httpVersion + "\n";
-		if(httpVersion == "HTTP/1.1"){
-			req += "Host: " + urlTokenized[0] + ":" + urlTokenized[1] + "\n";
+		if(httpVersion.equals("HTTP/1.1")){
+			req += "Host: " + urlTokenized[0] + "\n";
 		}
 		
-		System.out.println("we have the command: \"" + command + "\"");
-		
 		if(command.equals("PUT") || command.equals("POST")){
-			System.out.println("we are after the choice...");
 			System.out.println("What data do you want to include? Enter a string below:");
 			String sentence = getUserInput();
 			System.out.println(sentence);
 			req += "Content-Length: " + sentence.length() + "\n\n" + sentence + "\n";
 		}
+		//TODO: dit is om te debuggen.
 		System.out.println("current query:");
 		System.out.println(req);
 		return req;
