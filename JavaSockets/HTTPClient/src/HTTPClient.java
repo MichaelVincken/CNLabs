@@ -32,10 +32,12 @@ public class HTTPClient {
 		String request = createRequest(argv[0],argv[3],parsedUrl);
 		
 		// Sending request
-		outToServer.writeBytes(request + '\n');
+		outToServer.writeBytes(request + "\n\n");
 		
 		// Polling response
 		String modifiedSentence = inFromServer.readLine();
+		
+		System.out.println("processing for request");
 		
 		// Process response
 		System.out.println("FROM SERVER:"); 
@@ -79,8 +81,9 @@ public class HTTPClient {
 	 * @param httpVersion
 	 * @param urlTokenized
 	 * @return
+	 * @throws IOException 
 	 */
-	private static String createRequest(String command, String httpVersion, String[] urlTokenized) {
+	private static String createRequest(String command, String httpVersion, String[] urlTokenized) throws IOException {
 		
 		String req = command + " " + urlTokenized[2] + " " + httpVersion + "\n";
 		if(httpVersion.equals("HTTP/1.1")){
@@ -90,15 +93,18 @@ public class HTTPClient {
 		}
 		
 		if(command.equals("PUT") || command.equals("POST")){
+			BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
+			
 			System.out.println("What's the content type of the data you want to include?");
 			System.out.println("e.g. \"text/plain\", \"text/html\" or \"application/x-www-form-urlencoded\"");
 			// Currently ignored in server. Also not checked for validity.
-			String mime = getUserInput();
+			String mime = inFromUser.readLine();
 			System.out.println("Enter a string to include in the body:");
-			String sentence = getUserInput();
+			String sentence = inFromUser.readLine();
+			inFromUser.close();
 			System.out.println(sentence);
 			req += "Content-Type: " + mime + "\n";
-			req += "Content-Length: " + sentence.length() + "\n\n" + sentence + "\n";
+			req += "Content-Length: " + sentence.length() + "\n\n" + sentence;
 		}
 		return req;
 	}
@@ -125,21 +131,6 @@ public class HTTPClient {
 		if(path == null) path = "/";
 		
 		String[] res = {domain,port,path};
-		return res;
-	}
-	
-	/**
-	 * Reads one line of user input and returns it.
-	 */
-	public static String getUserInput(){
-		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
-		String res = "";
-		try {
-			res = inFromUser.readLine();
-			inFromUser.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 		return res;
 	}
 	

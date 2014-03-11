@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.Date;
 import java.util.LinkedList;
@@ -92,7 +93,12 @@ public class Handler implements Runnable {
 									return404(outToClient,properties[2]);
 									return;
 								}
-				case "PUT": 	;//TODO: PUT
+				case "PUT": 	Files.write(filePath, body, Charset.defaultCharset());
+								//Valid PUT response
+								response = properties[2] + " 200 Data written\n";
+								response += getHead(filePath) + "\n\n";
+								outToClient.writeBytes(response);
+								return;
 				case "POST": 	;//TODO: POST
 				default: response = properties[2] + " 501 Not Implemented\n\n";
 			}
