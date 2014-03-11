@@ -1,8 +1,8 @@
 import java.io.*;
 import java.net.Socket;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.regex.*;
@@ -11,19 +11,14 @@ import java.util.regex.*;
 public class Handler implements Runnable {
 	
 	private Socket connectionSocket;
-	private Calendar birthdate;
-	private String httpVersion;
-	private boolean lastRequest = true;
-	private ConcurrencyController controller;
 	private static Pattern cmdPattern = Pattern.compile("^(?<command>\\w*) (?<path>.*?) (?<httpVersion>HTTP/\\d\\.\\d)");
 	private static Pattern headerPattern = Pattern.compile("^(.+?):[ \\t]*(.*)");
 	private static Pattern headerPatternTail = Pattern.compile("^[ \\t]+(.+)");
 	final static String WEBSITE_ROOT = "localhost";
 	final static String LOG_FILENAME = "put-post-log.txt";
-	public Handler(Socket clientSocket, ConcurrencyController cont, Calendar justNow){
+	
+	public Handler(Socket clientSocket){
 		connectionSocket = clientSocket;
-		birthdate = justNow;
-		controller = cont;
 	}
 	
 
@@ -40,13 +35,14 @@ public class Handler implements Runnable {
 			String clientSentence = inFromClient.readLine(); 
 			System.out.println(clientSentence);
 			String[] properties = tokenizeProperties(clientSentence);
-			httpVersion = properties[2];
 			
 			//Process headers. (Although we're only interested in the Host header for now.)
 			LinkedList<String[]> headers = collectHeaders(inFromClient);
 			
 			//Process body
 			LinkedList<String> body = collectBody(inFromClient);
+			
+			//TODO: accept chunked data requests...
 			
 			//We now start building the response...
 			String response = "";
@@ -55,7 +51,6 @@ public class Handler implements Runnable {
 			String domain = WEBSITE_ROOT;
 			if(properties[2].equals("HTTP/1.1")){
 				domain = getHostAddress(headers);
-				lastRequest = isConnectionClose(headers);
 				if(domain == null){
 					return400(outToClient,properties[2]);
 					return;
@@ -75,35 +70,31 @@ public class Handler implements Runnable {
 			//Constructing local path and log
 			Path filePath = FileSystems.getDefault().getPath(domain, properties[1]);
 			
+			//TODO:If-Modified-Since: or If-Unmodified-Since: Headers
+			
 			//Processing switch
 			switch(properties[0]){
 				case "GET":		if(Files.exists(filePath)){
 									//Valid GET response.
+									System.out.println("path exists");
 									response = properties[2] + " 200 OK\n";
-									//if(httpVersion.equals("HTTP/1.1)")) response += "Connection: close\n";
 									response += getHead(filePath) + "\n\n";
 									byte[] data = processGet(filePath);
-									waitYourTurn();
 									outToClient.writeBytes(response);
 									outToClient.write(data);
 									outToClient.writeBytes("\n\n");
-									//controller.release();
-									//if(httpVersion.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
 									return;					
 								} else {
 									//404 Error
+									System.out.println("lolnope");
 									return404(outToClient,properties[2]);
 									return;
 								}
 				case "HEAD":	if(Files.exists(filePath)){
 									//Valid HEAD response
 									response = properties[2] + " 200 OK\n";
-									//if(httpVersion.equals("HTTP/1.1)")) response += "Connection: close\n";
 									response += getHead(filePath) + "\n\n";
-									waitYourTurn();
 									outToClient.writeBytes(response);
-									//controller.release();
-									//if(httpVersion.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
 									return;
 								} else {
 									//404 Error
@@ -114,12 +105,8 @@ public class Handler implements Runnable {
 								if(writePutPostLog("PUT",filePath.toString(),domain+"/"+LOG_FILENAME,properties[2],body)){
 									//Valid PUT response
 									response = properties[2] + " 200 Data written\n";
-									//if(httpVersion.equals("HTTP/1.1)")) response += "Connection: close\n";
-									//response += getHead(filePath) + "\n\n";
-									waitYourTurn();
+									response += getHead(filePath) + "\n\n";
 									outToClient.writeBytes(response);
-									controller.release();
-									if(httpVersion.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
 									return;
 								} else {
 									//500 Error
@@ -129,12 +116,8 @@ public class Handler implements Runnable {
 				case "POST": 	if(writePutPostLog("POST",filePath.toString(),domain+"/"+LOG_FILENAME,properties[2],body)){
 									//Valid POST response
 									response = properties[2] + " 200 Data posted\n";
-									if(httpVersion.equals("HTTP/1.1)")) response += "Connection: close\n";
 									response += getHead(filePath) + "\n\n";
-									waitYourTurn();
 									outToClient.writeBytes(response);
-									controller.release();
-									if(httpVersion.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
 									return;
 								}else{
 									//500 error
@@ -145,44 +128,10 @@ public class Handler implements Runnable {
 			
 		}catch(IOException e){
 			//TODO: ?
-		}catch(IllegalMonitorStateException e){
-			//
 		}
 		
 	}
 	
-	/**
-	 * Check periodically with the concurrency controller whether we can send our data.
-	 * If not, puts the thread to sleep for 100ms. Returns true when we get the green light.
-	 * 
-	 * @return	true
-	 * 			when the concurrency controller gives us the green light.
-	 */
-	private boolean waitYourTurn(){
-		// No concurrency or connection persistence in HTTP/1.0
-		if(httpVersion.equals("HTTP/1.0")) return true;
-		
-		// Otherwise we check if it's our turn.
-		while(!controller.isNext(birthdate)){
-			// If not, sleep for a spell.
-			try {
-				birthdate.wait(100);
-			} catch (InterruptedException e) {
-				//
-			}
-		}
-		return true;
-	}
-	
-	/**
-	 * Writes the received PUT or POST request to the log in the correct directory,
-	 * depending on the Host Name: header. Returns  true if succeeded, false if
-	 * met with an IOException.
-	 *
-	 * @return	boolean:
-	 * 			true if succeed
-	 * 			false if write error
-	 */
 	private boolean writePutPostLog(String command, String directed, String path, String version, LinkedList<String> body){
 		
 		try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(path, true)))) {
@@ -213,7 +162,8 @@ public class Handler implements Runnable {
 		Date now = new Date();
 		String response = "Date: " + now.toString().substring(0, 3) + " " + now.toGMTString() + "\n";
 		response += "Content-Type: " + Files.probeContentType(filePath) + "\n";
-		response += "Content-Length: " + Files.size(filePath);
+		response += "Content-Length: " + Files.size(filePath) + "\n";
+		response += "Connection: close";
 		
 		return response;
 	}
@@ -231,15 +181,11 @@ public class Handler implements Runnable {
 	private void return500(DataOutputStream out, String version) throws IOException{
 		String response = version + " 500 Server error\n"
 				+ "Content-Type: text/html\n"
-				+ "Content-Length: 52\n";
-				if(version.equals("HTTP/1.1)")) response += "Connection: close\n";
-		response+= "\n"
+				+ "Content-Length: 52\n"
+				+ "\n"
 				+ "<html><body><h2>500: Server Error</h2></body></html>";
-		waitYourTurn();
 		out.writeBytes(response);
-		controller.release();
 		
-		if(version.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
 	}
 	
 	/**
@@ -255,17 +201,13 @@ public class Handler implements Runnable {
 	private void return404(DataOutputStream out, String version) throws IOException{
 		String response = version + " 404 File not found\n"
 				+ "Content-Type: text/html\n"
-				+ "Content-Length: 56\n";
-				if(version.equals("HTTP/1.1)")) response += "Connection: close\n";
-		response+= "\n"
+				+ "Content-Length: 56\n"
+				+ "\n"
 				+ "<html><body>\n"
 				+ "<h2>404: File not found</h2>\n"
 				+ "</body></html>\n\n";
-		waitYourTurn();
 		out.writeBytes(response);
-		controller.release();
 		
-		if(version.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
 	}
 	
 	/**
@@ -281,18 +223,14 @@ public class Handler implements Runnable {
 	private void return400(DataOutputStream out, String version) throws IOException{
 		String response = "HTTP/1.1 400 Bad Request\n"
 				+ "Content-Type: text/html\n"
-				+ "Content-Length: 111\n";
-		if(version.equals("HTTP/1.1)")) response += "Connection: close\n";
-		response+= "\n"
+				+ "Content-Length: 111\n"
+				+ "\n"
 				+ "<html><body>\n"
 				+ "<h2>No Host: header received</h2>\n"
 				+ "HTTP 1.1 requests must include the Host: header.\n"
 				+ "</body></html>\n\n";
-		waitYourTurn();
 		out.writeBytes(response);
-		controller.release();
-		
-		if(version.equals("HTTP/1.1") && lastRequest) connectionSocket.close();
+		System.out.println("Finished writing");
 	}
 
 	/**
@@ -324,24 +262,6 @@ public class Handler implements Runnable {
 			}
 		}
 		return null;
-	}
-	
-	/**
-	 * Used in HTTP/1.1 compliance. Checks if the headers include a Connection: close header.
-	 * 
-	 * @param 	headers
-	 * 			Array of headers.
-	 * 			- First element contains the name of the header.
-	 * 			- Second element contains the data.
-	 * @return	true if the headers include a Connection: close header, false otherwise.
-	 */
-	private boolean isConnectionClose(LinkedList<String[]> headers) {
-		for(String[] header : headers){
-			if(header[0].equals("Connection") && header[1].equals("close")){
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**
