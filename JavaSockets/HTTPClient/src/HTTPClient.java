@@ -80,7 +80,7 @@ public class HTTPClient {
 		
 		String req = command + " " + urlTokenized[2] + " " + httpVersion + "\n";
 		if(httpVersion.equals("HTTP/1.1")){
-			req += "Host: " + urlTokenized[0] + "\n";
+			req += "Host: " + urlTokenized[0] + ":" + urlTokenized[1] + "\n";
 		}
 		
 		if(command.equals("PUT") || command.equals("POST")){
