@@ -14,6 +14,7 @@ public class Handler implements Runnable {
 	private static Pattern headerPattern = Pattern.compile("^(.+?):[ \\t]*(.*)");
 	private static Pattern headerPatternTail = Pattern.compile("^[ \\t]+(.+)");
 	final static String WEBSITE_ROOT = "localhost";
+	final static String LOG_FILENAME = "put-post-log.txt";
 	
 	public Handler(Socket clientSocket){
 		connectionSocket = clientSocket;
@@ -59,7 +60,7 @@ public class Handler implements Runnable {
 					}
 				}
 			}
-			//Constructing local path
+			//Constructing local path and log
 			Path filePath = FileSystems.getDefault().getPath(domain, properties[1]);
 			
 			//TODO:If-Modified-Since: or If-Unmodified-Since: Headers
@@ -94,12 +95,27 @@ public class Handler implements Runnable {
 									return;
 								}
 				case "PUT": 	Files.write(filePath, body, Charset.defaultCharset());
-								//Valid PUT response
-								response = properties[2] + " 200 Data written\n";
-								response += getHead(filePath) + "\n\n";
-								outToClient.writeBytes(response);
-								return;
-				case "POST": 	;//TODO: POST
+								if(writePutPostLog("PUT",filePath.toString(),domain+"/"+LOG_FILENAME,properties[2],body)){
+									//Valid PUT response
+									response = properties[2] + " 200 Data written\n";
+									response += getHead(filePath) + "\n\n";
+									outToClient.writeBytes(response);
+									return;
+								} else {
+									//500 Error
+									return500(outToClient,properties[2]);
+								}
+								
+				case "POST": 	if(writePutPostLog("POST",filePath.toString(),domain+"/"+LOG_FILENAME,properties[2],body)){
+									//Valid POST response
+									response = properties[2] + " 200 Data posted\n";
+									response += getHead(filePath) + "\n\n";
+									outToClient.writeBytes(response);
+									return;
+								}else{
+									//500 error
+									return500(outToClient,properties[2]);
+								}
 				default: response = properties[2] + " 501 Not Implemented\n\n";
 			}
 			
@@ -107,6 +123,21 @@ public class Handler implements Runnable {
 			//TODO: ?
 		}
 		
+	}
+	
+	private boolean writePutPostLog(String command, String directed, String path, String version, LinkedList<String> body){
+		
+		try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(path, true)))) {
+		    out.println("Received request: " + command + ", directed to " + directed + ", over " + version);
+		    out.print("Body: ");
+			for(String line : body){
+		    	out.println(line);
+		    }
+		    out.println();
+		    return true;
+		}catch (IOException e) {
+		    return false;
+		}
 	}
 	
 	/**
@@ -128,6 +159,26 @@ public class Handler implements Runnable {
 		response += "Connection: close";
 		
 		return response;
+	}
+
+	/**
+	 * Canned 500 response.
+	 * 
+	 * @param 	out
+	 * 			Our mouthpiece.
+	 * @param 	version
+	 * 			HTTP/x.x
+	 * @throws 	IOException
+	 * 			If we can't transmit to the client.
+	 */
+	private void return500(DataOutputStream out, String version) throws IOException{
+		String response = version + " 500 Server error\n"
+				+ "Content-Type: text/html\n"
+				+ "Content-Length: 52\n"
+				+ "\n"
+				+ "<html><body><h2>500: Server Error</h2></body></html>";
+		out.writeBytes(response);
+		
 	}
 	
 	/**

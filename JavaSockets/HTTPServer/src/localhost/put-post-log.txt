@@ -1,0 +1,6 @@
+Received request: PUT, directed to localhost/pipi.html, over HTTP/1.0
+Body: halooooo?
+
+Received request: POST, directed to localhost/pipi.html, over HTTP/1.0
+Body: jasegneehe
+
