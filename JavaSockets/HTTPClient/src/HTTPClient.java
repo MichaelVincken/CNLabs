@@ -63,10 +63,10 @@ public class HTTPClient {
 			outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
 			inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 			
-			outToServer.writeBytes("GET " + url + " HTTP 1.0\n\n");
+			outToServer.writeBytes("GET " + url + " HTTP/1.0\n\n");
 			
 			String nextLine = inFromServer.readLine();
-			if(nextLine.startsWith("200")){
+			if(nextLine.contains("200")){
 				System.out.println("File found. Beginning download now...");
 				int contentLength = 0;
 				while(!nextLine.equals("") && !nextLine.equals("\n")){

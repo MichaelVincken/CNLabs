@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.Socket;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.Date;
@@ -60,6 +61,12 @@ public class Handler implements Runnable {
 					}
 				}
 			}
+			//Replacing spaces in path and fixing rel paths
+			properties[1] = properties[1].replaceAll("%20", " ");
+			if(properties[1].startsWith("./")){
+				properties[1] = properties[1].substring(1);
+			}
+			
 			//Constructing local path and log
 			Path filePath = FileSystems.getDefault().getPath(domain, properties[1]);
 			
