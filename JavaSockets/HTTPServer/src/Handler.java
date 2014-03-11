@@ -1,8 +1,8 @@
 import java.io.*;
 import java.net.Socket;
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.*;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.regex.*;
@@ -11,14 +11,18 @@ import java.util.regex.*;
 public class Handler implements Runnable {
 	
 	private Socket connectionSocket;
+	private Calendar birthdate;
+	private String httpVersion;
+	private ConcurrencyController controller;
 	private static Pattern cmdPattern = Pattern.compile("^(?<command>\\w*) (?<path>.*?) (?<httpVersion>HTTP/\\d\\.\\d)");
 	private static Pattern headerPattern = Pattern.compile("^(.+?):[ \\t]*(.*)");
 	private static Pattern headerPatternTail = Pattern.compile("^[ \\t]+(.+)");
 	final static String WEBSITE_ROOT = "localhost";
 	final static String LOG_FILENAME = "put-post-log.txt";
-	
-	public Handler(Socket clientSocket){
+	public Handler(Socket clientSocket, ConcurrencyController cont, Calendar justNow){
 		connectionSocket = clientSocket;
+		birthdate = justNow;
+		controller = cont;
 	}
 	
 
@@ -35,14 +39,13 @@ public class Handler implements Runnable {
 			String clientSentence = inFromClient.readLine(); 
 			System.out.println(clientSentence);
 			String[] properties = tokenizeProperties(clientSentence);
+			httpVersion = properties[2];
 			
 			//Process headers. (Although we're only interested in the Host header for now.)
 			LinkedList<String[]> headers = collectHeaders(inFromClient);
 			
 			//Process body
 			LinkedList<String> body = collectBody(inFromClient);
-			
-			//TODO: accept chunked data requests...
 			
 			//We now start building the response...
 			String response = "";
@@ -70,8 +73,6 @@ public class Handler implements Runnable {
 			//Constructing local path and log
 			Path filePath = FileSystems.getDefault().getPath(domain, properties[1]);
 			
-			//TODO:If-Modified-Since: or If-Unmodified-Since: Headers
-			
 			//Processing switch
 			switch(properties[0]){
 				case "GET":		if(Files.exists(filePath)){
@@ -80,9 +81,11 @@ public class Handler implements Runnable {
 									response = properties[2] + " 200 OK\n";
 									response += getHead(filePath) + "\n\n";
 									byte[] data = processGet(filePath);
+									waitYourTurn();
 									outToClient.writeBytes(response);
 									outToClient.write(data);
 									outToClient.writeBytes("\n\n");
+									controller.release();
 									return;					
 								} else {
 									//404 Error
@@ -94,7 +97,9 @@ public class Handler implements Runnable {
 									//Valid HEAD response
 									response = properties[2] + " 200 OK\n";
 									response += getHead(filePath) + "\n\n";
+									waitYourTurn();
 									outToClient.writeBytes(response);
+									controller.release();
 									return;
 								} else {
 									//404 Error
@@ -106,7 +111,9 @@ public class Handler implements Runnable {
 									//Valid PUT response
 									response = properties[2] + " 200 Data written\n";
 									response += getHead(filePath) + "\n\n";
+									waitYourTurn();
 									outToClient.writeBytes(response);
+									controller.release();
 									return;
 								} else {
 									//500 Error
@@ -117,7 +124,9 @@ public class Handler implements Runnable {
 									//Valid POST response
 									response = properties[2] + " 200 Data posted\n";
 									response += getHead(filePath) + "\n\n";
+									waitYourTurn();
 									outToClient.writeBytes(response);
+									controller.release();
 									return;
 								}else{
 									//500 error
@@ -132,6 +141,39 @@ public class Handler implements Runnable {
 		
 	}
 	
+	/**
+	 * Check periodically with the concurrency controller whether we can send our data.
+	 * If not, puts the thread to sleep for 100ms. Returns true when we get the green light.
+	 * 
+	 * @return	true
+	 * 			when the concurrency controller gives us the green light.
+	 */
+	private boolean waitYourTurn(){
+		// No concurrency or connection persistence in HTTP/1.0
+		if(httpVersion.equals("HTTP/1.0")) return true;
+		
+		// Otherwise we check if it's our turn.
+		while(!controller.isNext(birthdate)){
+			
+			// If not, sleep for a spell.
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				//
+			}
+		}
+		return true;
+	}
+	
+	/**
+	 * Writes the received PUT or POST request to the log in the correct directory,
+	 * depending on the Host Name: header. Returns  true if succeeded, false if
+	 * met with an IOException.
+	 *
+	 * @return	boolean:
+	 * 			true if succeed
+	 * 			false if write error
+	 */
 	private boolean writePutPostLog(String command, String directed, String path, String version, LinkedList<String> body){
 		
 		try(PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(path, true)))) {
@@ -162,8 +204,7 @@ public class Handler implements Runnable {
 		Date now = new Date();
 		String response = "Date: " + now.toString().substring(0, 3) + " " + now.toGMTString() + "\n";
 		response += "Content-Type: " + Files.probeContentType(filePath) + "\n";
-		response += "Content-Length: " + Files.size(filePath) + "\n";
-		response += "Connection: close";
+		response += "Content-Length: " + Files.size(filePath);
 		
 		return response;
 	}
@@ -184,7 +225,9 @@ public class Handler implements Runnable {
 				+ "Content-Length: 52\n"
 				+ "\n"
 				+ "<html><body><h2>500: Server Error</h2></body></html>";
+		waitYourTurn();
 		out.writeBytes(response);
+		controller.release();
 		
 	}
 	
@@ -206,7 +249,9 @@ public class Handler implements Runnable {
 				+ "<html><body>\n"
 				+ "<h2>404: File not found</h2>\n"
 				+ "</body></html>\n\n";
+		waitYourTurn();
 		out.writeBytes(response);
+		controller.release();
 		
 	}
 	
@@ -229,8 +274,9 @@ public class Handler implements Runnable {
 				+ "<h2>No Host: header received</h2>\n"
 				+ "HTTP 1.1 requests must include the Host: header.\n"
 				+ "</body></html>\n\n";
+		waitYourTurn();
 		out.writeBytes(response);
-		System.out.println("Finished writing");
+		controller.release();
 	}
 
 	/**
