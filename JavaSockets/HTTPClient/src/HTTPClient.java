@@ -11,34 +11,33 @@ public class HTTPClient {
 	
 	public static void main(String argv[]) throws Exception { 
 		
-		//String[] argv = {"GET", "www.robgendlerastropics.com/index.htm", "80", "HTTP/1.0"};
-		
 		LinkedList<String> images = new LinkedList<String>();
 		
 		// argv heeft de vorm [command, uri, port, httpVersion]
 		if(argv.length != 4){
-			throw new IllegalArgumentException("This client takes 4 arguments: "
-											+ "(i.) A HTTP command {HEAD, GET, PUT, or POST} "
-											+ "(ii.) A URI and (iii.) a	port. "
-											+ "(iv.) The HTTP version (1.0 or 1.1.).");
+			throw new IllegalArgumentException("This client takes 4 arguments: COMMAND, URI, PORT, VERSION.");
 		}
 		
+		// Parsing URL
 		String[] parsedUrl = parseUrl(argv[1],argv[2]);
 		String domain = parsedUrl[0];
 		int port = Integer.parseInt(argv[2]);
-		System.out.println("gaan verbinden met... " + domain + port);
+		
+		// Initial Set-up
 		Socket clientSocket = new Socket(domain, port);
 		DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
 		BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); 
 		
-		System.out.println(argv[0]);
+		// Create request
 		String request = createRequest(argv[0],argv[3],parsedUrl);
 		
-		System.out.println("sending..."); 
-		
+		// Sending request
 		outToServer.writeBytes(request + '\n');
+		
+		// Polling response
 		String modifiedSentence = inFromServer.readLine();
-		//processServerReply(modifiedSentence);
+		
+		// Process response
 		System.out.println("FROM SERVER:"); 
 		System.out.println(modifiedSentence); 
 		while(inFromServer.ready()){
@@ -49,6 +48,7 @@ public class HTTPClient {
 		
 		// TODO download images
 		
+		// Finish up
 		clientSocket.close();
 		
 	}
