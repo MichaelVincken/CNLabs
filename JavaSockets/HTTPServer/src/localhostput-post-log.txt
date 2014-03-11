@@ -1,8 +1,0 @@
-Received request: PUT, directed to localhost/pipi.html, over HTTP/1.0
-Body:
-hijahoe
-
-Received request: PUT, directed to localhost/pipi.html, over HTTP/1.0
-Body:
-nogeens?
-

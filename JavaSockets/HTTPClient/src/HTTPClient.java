@@ -61,7 +61,8 @@ public class HTTPClient {
 			
 			clientSocket = new Socket(domain, port);
 			outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
-			inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+			InputStream serverInputStream = clientSocket.getInputStream();
+			inFromServer = new BufferedReader(new InputStreamReader(serverInputStream));
 			
 			outToServer.writeBytes("GET " + url + " HTTP/1.0\n\n");
 			
@@ -76,16 +77,11 @@ public class HTTPClient {
 						contentLength = Integer.parseInt(temp[temp.length-1]);
 					}
 				}
-				
-				downloadimage(url, contentLength, clientSocket.getInputStream());
+				downloadimage(url, contentLength, serverInputStream);
 			}else{
 				System.out.println("Something went wrong. Message received:\n");
 				System.out.println(nextLine);
 			}
-			
-			
-			
-			
 		}
 		
 		clientSocket.close();
@@ -93,20 +89,44 @@ public class HTTPClient {
 	}
 
 	private static void downloadimage(String url, int contentLength, InputStream inputStream) throws IOException {
+		// We have to check if the file exists.
+		// If it does, delete it. (Dirty but simple way to clear it.)
+		// Then create a new file.
+		String[] urlSplit = url.split("/");
+		url = urlSplit[urlSplit.length - 1 ];
+		
+		File f = new File(url);
+		if(f.exists()){
+			f.delete();
+			File newF = new File(url);
+			newF.createNewFile();
+		} else {
+			f.createNewFile();
+		}
+		System.out.println("wehaveprettyfile");
 		FileOutputStream fos = new FileOutputStream(url, true);
 		// We buffer the image in batches of 4KB. Less than 1KB would be a waste, but
-		// we don't want to go higher than the CPU's L1 cache.
+		// we don't want to go higher than the CPU's L1 cache. 4KB is a pretty safe
+		// middle ground.
+		System.out.println("wehaveOS");
 		byte[] buffer = new byte[4096];
+		System.out.println("wehavebuffer and CL " + contentLength);
 		while(contentLength >= 4096){
+			System.out.println("filling buffer");
+			inputStream.read(buffer);
+			System.out.println("writing buffer");
 			fos.write(buffer);
-			contentLength--;
+			contentLength -= 4096;
 		}
+		System.out.println("wefinishwhile");
 		// We stop when there's less than 4KB remaining in the content area.
 		if(contentLength > 0){
 			// Make a new array to carry the last bunch of bytes.
 			byte[] rest = new byte[contentLength];
+			System.out.println("wefillrest");
 			inputStream.read(rest);
-			fos.write(buffer);
+			System.out.println("wewriterest");
+			fos.write(rest);
 		}
 		// Tidy up and release resources.
 		fos.close();
@@ -124,8 +144,9 @@ public class HTTPClient {
 		LinkedList<String> images = new LinkedList<String>();
 		Matcher m = imgPattern.matcher(reply);
 		while(m.find()){
-			images.add(m.group(1));
-			System.out.println(m.group(1));
+			String i = m.group(1);
+			if(i.startsWith("./")) i = i.substring(1);
+			images.add(i);
 		}
 		return images;
 		
