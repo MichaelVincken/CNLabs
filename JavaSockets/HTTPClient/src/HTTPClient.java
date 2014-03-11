@@ -54,7 +54,11 @@ public class HTTPClient {
 	}
 	
 	/**
-	 * only extracts the images atm
+	 * Takes a line of HTML and returns a linked list of URLs to the embedded images.
+	 * 
+	 * @param	reply
+	 * 			Line of HTML
+	 * @return	LinkedList of image URLs
 	 */
 	private static LinkedList<String> processServerReply(String reply) {
 		LinkedList<String> images = new LinkedList<String>();
@@ -69,7 +73,7 @@ public class HTTPClient {
 
 	/**
 	 * Builds a request. Minimal HTTP/1.0 and HTTP/1.1 implementation.
-	 * TODO: I think. will have to check specs in more detail.
+	 * TODO: Does not yet support pipelining.
 	 * 
 	 * @param command
 	 * @param httpVersion
@@ -81,17 +85,21 @@ public class HTTPClient {
 		String req = command + " " + urlTokenized[2] + " " + httpVersion + "\n";
 		if(httpVersion.equals("HTTP/1.1")){
 			req += "Host: " + urlTokenized[0] + ":" + urlTokenized[1] + "\n";
+			//TODO: Disables persistent connections for now...
+			req += "Connection: close\n";
 		}
 		
 		if(command.equals("PUT") || command.equals("POST")){
-			System.out.println("What data do you want to include? Enter a string below:");
+			System.out.println("What's the content type of the data you want to include?");
+			System.out.println("e.g. \"text/plain\", \"text/html\" or \"application/x-www-form-urlencoded\"");
+			// Currently ignored in server. Also not checked for validity.
+			String mime = getUserInput();
+			System.out.println("Enter a string to include in the body:");
 			String sentence = getUserInput();
 			System.out.println(sentence);
+			req += "Content-Type: " + mime + "\n";
 			req += "Content-Length: " + sentence.length() + "\n\n" + sentence + "\n";
 		}
-		//TODO: dit is om te debuggen.
-		System.out.println("current query:");
-		System.out.println(req);
 		return req;
 	}
 
@@ -121,7 +129,7 @@ public class HTTPClient {
 	}
 	
 	/**
-	 * Takes one line of user input and returns it.
+	 * Reads one line of user input and returns it.
 	 */
 	public static String getUserInput(){
 		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
