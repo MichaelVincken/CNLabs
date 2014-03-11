@@ -25,9 +25,6 @@ public class ConcurrencyController {
 	
 	public void release(){
 		queue.poll();
-		if(queue.size()>0){
-			queue.peek().notifyAll();
-		}
 	}
 
 }
