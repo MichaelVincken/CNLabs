@@ -1,6 +1,10 @@
 
 import java.io.*; 
 import java.net.*;
+import java.nio.charset.Charset;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.regex.*;
 
@@ -8,6 +12,7 @@ public class HTTPClient {
 	
 	private static Pattern urlPattern = Pattern.compile("^(?<domain>[a-zA-Z.]*)(?:\\:(?<port>\\d*))?(?<path>/.*)?");
 	private static Pattern imgPattern = Pattern.compile("<img.+?src=\"(.+?)\"");
+	private static Socket clientSocket;
 	
 	public static void main(String argv[]) throws Exception { 
 		
@@ -24,7 +29,7 @@ public class HTTPClient {
 		int port = Integer.parseInt(argv[2]);
 		
 		// Initial Set-up
-		Socket clientSocket = new Socket(domain, port);
+		clientSocket = new Socket(domain, port);
 		DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
 		BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); 
 		
@@ -48,13 +53,66 @@ public class HTTPClient {
 			images.addAll(processServerReply(modifiedSentence));
 		}
 		
-		// TODO download images
+		// download images
+		for(String url : images){
+			clientSocket.close();
+			outToServer.close();
+			inFromServer.close();
+			
+			clientSocket = new Socket(domain, port);
+			outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
+			inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+			
+			outToServer.writeBytes("GET " + url + " HTTP 1.0\n\n");
+			
+			String nextLine = inFromServer.readLine();
+			if(nextLine.startsWith("200")){
+				System.out.println("File found. Beginning download now...");
+				int contentLength = 0;
+				while(!nextLine.equals("") && !nextLine.equals("\n")){
+					nextLine = inFromServer.readLine();
+					if(nextLine.startsWith("Content-Length:")){
+						String[] temp = nextLine.split(" ");
+						contentLength = Integer.parseInt(temp[temp.length-1]);
+					}
+				}
+				
+				downloadimage(url, contentLength, clientSocket.getInputStream());
+			}else{
+				System.out.println("Something went wrong. Message received:\n");
+				System.out.println(nextLine);
+			}
+			
+			
+			
+			
+		}
 		
-		// Finish up
 		clientSocket.close();
 		
 	}
-	
+
+	private static void downloadimage(String url, int contentLength, InputStream inputStream) throws IOException {
+		FileOutputStream fos = new FileOutputStream(url, true);
+		// We buffer the image in batches of 4KB. Less than 1KB would be a waste, but
+		// we don't want to go higher than the CPU's L1 cache.
+		byte[] buffer = new byte[4096];
+		while(contentLength >= 4096){
+			fos.write(buffer);
+			contentLength--;
+		}
+		// We stop when there's less than 4KB remaining in the content area.
+		if(contentLength > 0){
+			// Make a new array to carry the last bunch of bytes.
+			byte[] rest = new byte[contentLength];
+			inputStream.read(rest);
+			fos.write(buffer);
+		}
+		// Tidy up and release resources.
+		fos.close();
+		
+	}
+
 	/**
 	 * Takes a line of HTML and returns a linked list of URLs to the embedded images.
 	 * 
