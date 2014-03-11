@@ -52,26 +52,27 @@ public class HTTPClient {
 			System.out.println(modifiedSentence);
 			images.addAll(processServerReply(modifiedSentence));
 		}
+
+		inFromServer.close();
 		
 		// download images
 		for(String url : images){
 			clientSocket.close();
 			outToServer.close();
-			inFromServer.close();
 			
 			clientSocket = new Socket(domain, port);
 			outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
 			InputStream serverInputStream = clientSocket.getInputStream();
-			inFromServer = new BufferedReader(new InputStreamReader(serverInputStream));
 			
 			outToServer.writeBytes("GET " + url + " HTTP/1.0\n\n");
 			
-			String nextLine = inFromServer.readLine();
+			String nextLine = readNexLine(serverInputStream);
+			
 			if(nextLine.contains("200")){
 				System.out.println("File found. Beginning download now...");
 				int contentLength = 0;
-				while(!nextLine.equals("") && !nextLine.equals("\n")){
-					nextLine = inFromServer.readLine();
+				while(!nextLine.equals("")){
+					nextLine = readNexLine(serverInputStream);
 					if(nextLine.startsWith("Content-Length:")){
 						String[] temp = nextLine.split(" ");
 						contentLength = Integer.parseInt(temp[temp.length-1]);
@@ -82,10 +83,22 @@ public class HTTPClient {
 				System.out.println("Something went wrong. Message received:\n");
 				System.out.println(nextLine);
 			}
+			
+			serverInputStream.close();
 		}
-		
+		outToServer.close();
 		clientSocket.close();
 		
+	}
+
+	private static String readNexLine(InputStream serverInputStream) throws IOException {
+		char nextChar = (char) serverInputStream.read();
+		String res = "";
+		while(nextChar != '\n'){
+			res += nextChar;
+			nextChar = (char) serverInputStream.read();
+		}
+		return res;
 	}
 
 	private static void downloadimage(String url, int contentLength, InputStream inputStream) throws IOException {
