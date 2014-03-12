@@ -1,0 +1,31 @@
+body{margin:0;padding:0}
+#wrapper{width:980px; margin:0px auto;border-left:1px solid #ddd;border-right:1px solid #ddd}
+#subnav,#nieuws{display:none}
+
+#mainnav{position:absolute;bottom:0;left:180px; width:800px}
+#nav a{padding:10px 10px 10px 20px;background:url(https://stijl.kuleuven.be/_i/icons/icon_nav.png) no-repeat 4px 50%}
+/*#nav a{padding:0 6px 6px}*/
+
+#portal-columns{margin:0 10px; padding-top: 10px;}
+.lc #subnav{display:block}
+.rc #nieuws{display:block}
+#contentwrapper{float:left;width:100%;padding:0 0 50px 0;overflow:visible}
+#subnav, #contentwrapper, #nieuws{position:relative}
+#nieuws{clear:both}
+.lc#portal-columns{padding-left:170px}
+.lc #subnav{float:left;width:160px;margin-right:-170px;right:170px}
+.rc#portal-columns{padding-right:210px}
+.rc #nieuws{clear:none;float:left;width:200px;margin-left:-200px;left:210px}
+
+.twocol{width:48%;float:left;position:relative}
+.twocol+.twocol{float:right}
+.threecol{width:31%;float:left;position:relative}
+
+#nieuwswrap #tekstnieuws{width:55.7241%}
+#nieuwswrap #kalender{width:41.3793%;padding:0 5px 0 0}
+
+/*iframe[id="slideshow"]{display:block;width:580px;height:300px}
+iframe[id="iframe_slideshow"]{display:block;width:580px;height:300px}*/
+
+/*img,object,embed,iframe{max-width:100%;height:auto}
+img{-ms-interpolation-mode:bicubic}*/
