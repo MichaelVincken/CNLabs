@@ -12,6 +12,7 @@ public class HTTPClient {
 	private static int port;
 	private static Pattern urlPattern = Pattern.compile("^(?<domain>[a-zA-Z.]*)(?:\\:(?<port>\\d*))?(?<path>/.*)?");
 	private static Pattern imgPattern = Pattern.compile("<img.+?src=\"(.+?)\"");
+	private static Pattern headerPattern = Pattern.compile("^(.+?):[ \\t]*(.*)");
 	private static Socket clientSocket;
 	
 	public static void main(String argv[]) throws Exception { 
@@ -56,6 +57,15 @@ public class HTTPClient {
 			if(modifiedSentence.startsWith("Content-Length")){
 				String[] headerSplit = modifiedSentence.split(" ");
 				String contentLengthStr = headerSplit[headerSplit.length - 1];
+				
+				char[] nums = {'0','1','2','3','4','5','6','7','8','9','n'};
+				test:for(char c : nums){
+					if(c == 'n'){
+						contentLengthStr = contentLengthStr.substring(0, contentLengthStr.length() -1 );
+						break;
+					}
+					if(c == contentLengthStr.charAt(contentLengthStr.length() - 1)) break test;
+				}
 				contentLength = Integer.parseInt(contentLengthStr);
 			}
 		}
@@ -90,7 +100,9 @@ public class HTTPClient {
 			}
 			
 			String nextLine = readNexLine(serverInputStream);
-			if(nextLine.equals("\n") || nextLine.equals("")) nextLine = readNexLine(serverInputStream);
+			while(nextLine.equals("\n") || nextLine.equals("")){
+				nextLine = readNexLine(serverInputStream);
+			}
 			
 			if(nextLine.contains("200")){
 				System.out.println("File found. Beginning download now...");
@@ -145,24 +157,17 @@ public class HTTPClient {
 		// We buffer the image in batches of 4KB. Less than 1KB would be a waste, but
 		// we don't want to go higher than the CPU's L1 cache. 4KB is a pretty safe
 		// middle ground.
-		System.out.println("wehaveOS");
 		byte[] buffer = new byte[4096];
-		System.out.println("wehavebuffer and CL " + contentLength);
 		while(contentLength >= 4096){
-			System.out.println("filling buffer");
 			inputStream.read(buffer);
-			System.out.println("writing buffer");
 			fos.write(buffer);
 			contentLength -= 4096;
 		}
-		System.out.println("wefinishwhile");
 		// We stop when there's less than 4KB remaining in the content area.
 		if(contentLength > 0){
 			// Make a new array to carry the last bunch of bytes.
 			byte[] rest = new byte[contentLength];
-			System.out.println("wefillrest");
 			inputStream.read(rest);
-			System.out.println("wewriterest");
 			fos.write(rest);
 		}
 		// Tidy up and release resources.

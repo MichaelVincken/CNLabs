@@ -341,8 +341,12 @@ public class Handler implements Runnable {
 		boolean moreHeaders = true;
 		LinkedList<String[]> headers = new LinkedList<String[]>();
 		
-		while(inFromClient.ready() && moreHeaders){
-			String header = inFromClient.readLine();
+		System.out.println("start gathering");
+		
+		String header = inFromClient.readLine();
+		
+		while(!(header.equals("\n")||header.equals("")) && moreHeaders){
+			//String header = inFromClient.readLine();
 			System.out.println(header);
 			Matcher m = headerPattern.matcher(header);
 			// Does this match what a header looks like?
@@ -359,6 +363,7 @@ public class Handler implements Runnable {
 					moreHeaders = false;
 				}
 			}
+			header = inFromClient.readLine();
 		}
 		return headers;
 	}
