@@ -1,15 +1,15 @@
 
 import java.io.*; 
 import java.net.*;
-import java.nio.charset.Charset;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.LinkedList;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.regex.*;
 
 public class HTTPClient { 
 	
+	private static String httpVersion;
+	private static String domain;
+	private static int port;
 	private static Pattern urlPattern = Pattern.compile("^(?<domain>[a-zA-Z.]*)(?:\\:(?<port>\\d*))?(?<path>/.*)?");
 	private static Pattern imgPattern = Pattern.compile("<img.+?src=\"(.+?)\"");
 	private static Socket clientSocket;
@@ -25,13 +25,15 @@ public class HTTPClient {
 		
 		// Parsing URL
 		String[] parsedUrl = parseUrl(argv[1],argv[2]);
-		String domain = parsedUrl[0];
-		int port = Integer.parseInt(argv[2]);
+		domain = parsedUrl[0];
+		httpVersion = argv[3];
+		port = Integer.parseInt(argv[2]);
 		
 		// Initial Set-up
 		clientSocket = new Socket(domain, port);
+		InputStream serverInputStream = clientSocket.getInputStream();
 		DataOutputStream outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
-		BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); 
+		//BufferedReader inFromServer = new BufferedReader(new InputStreamReader(clientSocket.getInputStream())); 
 		
 		// Create request
 		String request = createRequest(argv[0],argv[3],parsedUrl);
@@ -40,38 +42,60 @@ public class HTTPClient {
 		outToServer.writeBytes(request + "\n\n");
 		
 		// Polling response
-		String modifiedSentence = inFromServer.readLine();
-		
-		System.out.println("processing for request");
+		String modifiedSentence = readNexLine(serverInputStream);
 		
 		// Process response
 		System.out.println("FROM SERVER:"); 
-		System.out.println(modifiedSentence); 
-		while(inFromServer.ready()){
-			modifiedSentence = inFromServer.readLine();
+		System.out.println(modifiedSentence);
+		
+		// Get headers and watch for content length
+		int contentLength = -1;
+		while(!modifiedSentence.equals("\n") && !modifiedSentence.equals("")){
+			modifiedSentence = readNexLine(serverInputStream);
 			System.out.println(modifiedSentence);
-			images.addAll(processServerReply(modifiedSentence));
+			if(modifiedSentence.startsWith("Content-Length")){
+				String[] headerSplit = modifiedSentence.split(" ");
+				String contentLengthStr = headerSplit[headerSplit.length - 1];
+				contentLength = Integer.parseInt(contentLengthStr);
+			}
 		}
+		
+		while(contentLength > 0){
+			//We're receiving content!
+			modifiedSentence = readNexLine(serverInputStream);
+			System.out.println(modifiedSentence);
+			images.addAll(processServerReply(modifiedSentence,outToServer));
+			contentLength -= (modifiedSentence.length() + 1);
+		}
+		
+		//Remove junk.
 
-		inFromServer.close();
+		//inFromServer.close();
 		
 		// download images
 		for(String url : images){
-			clientSocket.close();
-			outToServer.close();
-			
-			clientSocket = new Socket(domain, port);
-			outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
-			InputStream serverInputStream = clientSocket.getInputStream();
-			
-			outToServer.writeBytes("GET " + url + " HTTP/1.0\n\n");
+			//HTTP/1.0 means we open a new connection for every transfer...
+			if(httpVersion.equals("HTTP/1.0")){
+				//close
+				serverInputStream.close();
+				clientSocket.close();
+				outToServer.close();
+				//open
+				clientSocket = new Socket(domain, port);
+				outToServer = new DataOutputStream(clientSocket.getOutputStream()); 
+				serverInputStream = clientSocket.getInputStream();
+				
+				//We'll only place the request now...
+				outToServer.writeBytes("GET " + url + " HTTP/1.0\n\n");
+			}
 			
 			String nextLine = readNexLine(serverInputStream);
+			if(nextLine.equals("\n") || nextLine.equals("")) nextLine = readNexLine(serverInputStream);
 			
 			if(nextLine.contains("200")){
 				System.out.println("File found. Beginning download now...");
-				int contentLength = 0;
-				while(!nextLine.equals("")){
+				contentLength = 0;
+				while(!nextLine.equals("") && !nextLine.equals("\n")){
 					nextLine = readNexLine(serverInputStream);
 					if(nextLine.startsWith("Content-Length:")){
 						String[] temp = nextLine.split(" ");
@@ -83,11 +107,11 @@ public class HTTPClient {
 				System.out.println("Something went wrong. Message received:\n");
 				System.out.println(nextLine);
 			}
-			
-			serverInputStream.close();
 		}
-		outToServer.close();
+		
+		serverInputStream.close();
 		clientSocket.close();
+		outToServer.close();
 		
 	}
 
@@ -151,15 +175,24 @@ public class HTTPClient {
 	 * 
 	 * @param	reply
 	 * 			Line of HTML
+	 * @param outToServer 
 	 * @return	LinkedList of image URLs
+	 * @throws IOException 
 	 */
-	private static LinkedList<String> processServerReply(String reply) {
+	private static LinkedList<String> processServerReply(String reply, DataOutputStream outToServer) throws IOException {
 		LinkedList<String> images = new LinkedList<String>();
 		Matcher m = imgPattern.matcher(reply);
 		while(m.find()){
 			String i = m.group(1);
 			if(i.startsWith("./")) i = i.substring(1);
 			images.add(i);
+			
+			if(httpVersion.equals("HTTP/1.1")){
+
+				//We send the requests already!
+				outToServer.writeBytes("GET " + i + " " + httpVersion + "\nHost: " + domain + ":" + port + "\n\n");
+			}
+			
 		}
 		return images;
 		
@@ -180,8 +213,7 @@ public class HTTPClient {
 		String req = command + " " + urlTokenized[2] + " " + httpVersion + "\n";
 		if(httpVersion.equals("HTTP/1.1")){
 			req += "Host: " + urlTokenized[0] + ":" + urlTokenized[1] + "\n";
-			//TODO: Disables persistent connections for now...
-			req += "Connection: close\n";
+			//req += "Connection: close\n";
 		}
 		
 		if(command.equals("PUT") || command.equals("POST")){
@@ -194,7 +226,6 @@ public class HTTPClient {
 			System.out.println("Enter a string to include in the body:");
 			String sentence = inFromUser.readLine();
 			inFromUser.close();
-			System.out.println(sentence);
 			req += "Content-Type: " + mime + "\n";
 			req += "Content-Length: " + sentence.length() + "\n\n" + sentence;
 		}

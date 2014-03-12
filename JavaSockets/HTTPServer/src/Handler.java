@@ -41,9 +41,10 @@ public class Handler implements Runnable {
 				
 				//Process first line...
 				String clientSentence = inFromClient.readLine();
-				while(clientSentence.equals("\n")){
+				while(clientSentence != null && clientSentence.equals("\n")){
 					clientSentence = inFromClient.readLine();
 				}
+				if(clientSentence == null) break processRequests;
 				System.out.println();
 				System.out.println("Received request: ");
 				System.out.println(clientSentence);
