@@ -56,7 +56,7 @@ $ns duplex-link $n5 $n7 100Mb 0.3ms DropTail
 #$ns duplex-link-op $n5 $n6 orient right-up
 #$ns duplex-link-op $n5 $n7 orient right-down
 
-# FTP Connection
+# FTP Connection -- (Downloading data from a server within the KU Leuven network)
 # Put start and end time between nodes in an array
 set ftpConnection(origin) $n6
 set ftpConnection(destination) $n1
@@ -81,7 +81,7 @@ set ftp [new Application/FTP]
 $ftp attach-agent $tcp
 
 
-# UDP Connection
+# UDP Connection -- (Uploading data to a server on the Internet)
 # Put start and end time between nodes in an array
 set udpConnection(origin) $n0
 set udpConnection(destination) $n7
@@ -100,10 +100,8 @@ $udp set fid_ 2
 set cbr [new Application/Traffic/CBR]
 $cbr attach-agent $udp
 $cbr set packetSize_ 1500
-$cbr set rate_ 0.01Mb
+$cbr set rate_ 10.0Mb
 $cbr set random_ false
-
-
 
 # Window plotting
 $ns at 0.1 "plotWindow $tcp $wf"
