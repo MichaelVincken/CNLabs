@@ -8,11 +8,11 @@ $ns color 1 Blue
 $ns color 2 Red
 
 # Trace file
-set tf [open oef1.out.tr w]
+set tf [open oef1_2.out.tr w]
 $ns trace-all $tf
 
 # NAM tracefile
-set nf [open oef1.out.nam w]
+set nf [open oef1_2.out.nam w]
 $ns namtrace-all $nf
 
 proc finish {} {
@@ -22,7 +22,7 @@ proc finish {} {
         close $tf
         close $nf
 
-        exec nam oef1.out.nam &
+        exec nam oef1_2.out.nam &
         exit 0
 }
 
@@ -64,22 +64,7 @@ set ftpConnection(start) 0.1
 set ftpConnection(stop) 9.9
 
 # Setting winfile
-set wf [open exercice1.wf w]
-
-# Setup a TCP Connection
-set tcp [new Agent/TCP]
-$ns attach-agent $ftpConnection(origin) $tcp
-set sink [new Agent/TCPSink]
-$ns attach-agent $ftpConnection(destination) $sink
-$ns connect $tcp $sink
-$tcp set fid_ 1
-$tcp set packetSize_ 1000       #default packagesize
-$tcp set window_ 80
-
-# Setup a FTP over TCP connection
-set ftp [new Application/FTP]
-$ftp attach-agent $tcp
-
+set wf [open exercice1_2.wf w]
 
 # UDP Connection -- (Uploading data to a server on the Internet)
 # Put start and end time between nodes in an array
@@ -103,9 +88,7 @@ $cbr set packetSize_ 1500
 $cbr set random_ false
 
 # Timimg
-$ns at $ftpConnection(start) "$ftp start"
 $ns at $udpConnection(start) "$cbr start"
-$ns at $ftpConnection(stop) "$ftp stop"
 $ns at $udpConnection(stop) "$cbr stop"
 
 $ns at 10.0 "finish"
