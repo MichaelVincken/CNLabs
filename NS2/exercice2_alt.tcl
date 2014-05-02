@@ -8,7 +8,12 @@ set nf [open out.nam w]
 $ns namtrace-all $nf
 
 #http connections log
-set file1 [open httpConnections.txt w]
+set fileHttpConnections [open httpConnection_log.txt w]
+#congestion window log
+set fileCongestionWindow [open congestionWindow_log.txt w]
+#slow start threshold log
+set fileSsthresh [open ssthresh_log.txt w]
+
 
 $ns color 0 Blue
 $ns color 1 Red
@@ -99,10 +104,8 @@ for {set i 1} {$i <= 120} {incr i} {
 	$ns at $startTime "$ftpCollection($i) send $fileSizeCollection($i)"
 
 	# write to file
-	puts $file1 "file_$i connection_$i $startTime $fileSizeCollection($i)"
+	puts $fileHttpConnections "file_$i connection_$i $startTime $fileSizeCollection($i)"
 }
-
-set winfile [open WinFile w]
 
 #procedure for plotting window size
 proc plotWindow {tcpSource file} {
@@ -113,7 +116,7 @@ proc plotWindow {tcpSource file} {
 	puts $file "$now $cwnd"
 	$ns at [expr $now+$time] "plotWindow $tcpSource $file"
 }
-$ns at 0.1 "plotWindow $tcp1 $winfile"
+$ns at 0.1 "plotWindow $tcp1 $fileCongestionWindow"
 
 proc plotThreshold {tcpSource file} {
 	global ns
@@ -123,7 +126,7 @@ proc plotThreshold {tcpSource file} {
 	puts $file "$now $ssthresh"
 	$ns at [expr $now + $time] "plotThreshold $tcpSource $file"
 }
-$ns at 0.1 "plotThreshold $tcp1 $winfile"
+$ns at 0.1 "plotThreshold $tcp1 $fileSsthresh"
 
 #schedule events
 $ns at 0.0 "$ftp1 start"
