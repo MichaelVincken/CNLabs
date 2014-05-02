@@ -7,6 +7,9 @@ $ns trace-all $tf
 set nf [open out.nam w]
 $ns namtrace-all $nf
 
+#http connections log
+set file1 [open httpConnections.txt w]
+
 $ns color 0 Blue
 $ns color 1 Red
 
@@ -91,9 +94,12 @@ for {set i 1} {$i <= 120} {incr i} {
 	}
 	# and timing...
 	set increment [$expoGenerator value]
-	set fileSize [$paretoGenerator value]
+	set fileSizeCollection($i) [expr int([$paretoGenerator value])]
 	set startTime [expr $startTime + $increment]
-	$ns at $startTime "$ftpCollection($i) send $fileSize"
+	$ns at $startTime "$ftpCollection($i) send $fileSizeCollection($i)"
+
+	# write to file
+	puts $file1 "file_$i connection_$i $startTime $fileSizeCollection($i)"
 }
 
 set winfile [open WinFile w]
