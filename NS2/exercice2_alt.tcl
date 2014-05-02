@@ -33,6 +33,7 @@ $ns duplex-link $n0 $n4 10Mb 10ms DropTail
 $ns duplex-link $n1 $n3 10Mb 10ms DropTail
 $ns duplex-link $n1 $n5 10Mb 10ms DropTail
 $ns queue-limit $n0 $n1 20
+$ns queue-limit $n1 $n0 20
 
 
 #set up the tcp connection
@@ -42,16 +43,11 @@ set sink1 [new Agent/TCPSink]
 $ns attach-agent $n2 $sink1
 $ns connect $tcp1 $sink1
 $tcp1 set fid_ 1
-$tcp1 set windowd_ 80
+$tcp1 set window_ 80
 
 #setting up the ftp over tcp connection
 set ftp1 [new Application/FTP]
 $ftp1 attach-agent $tcp1
-
-
-# FTP Connection -- (Downloading data from a server within the KU Leuven network)
-set ftpConnection(origin) $n5
-set ftpConnection(destination) $n4
 
 # Pareto random number generator for HTML file package sizes
 set paretoGenerator [new RandomVariable/Pareto]
@@ -70,30 +66,23 @@ proc getIntervalSize {} {
 	return $expoGenerator value
 }
 
-# Procedure for setting up a TCP connection
-proc setupFTP {} {
-	set tcp [new Agent/TCP]
-	$ns attach-agent $ftpConnection(origin) $tcp
-	set sink [new Agent/TCPSink]
-	$ns attach-agent $ftpConnection(destination) $sink
-	$ns connect $tcp $sink
-	$tcp set fid_ 1
-	$tcp set window_ 80
-
-	set ftp [new Application/FTP]
-	$ftp attach-agent $tcp
-
-	return $ftp
-}
-
 # Create 120 FTP connections
 set startTime 5
-set startStringPrefix "$ftpCollection("
-set startStringSuffix ") send "
 for {set i 1} {$i <= 120} {incr i} {
-	set ftpCollection(i) setupFTP
 
-	# Dirty hops. Dirty simple, that is!
+	# setting up an TCP connection
+	set tcpCollection($i) [new Agent/TCP]
+	$ns attach-agent $n5 $tcpCollection($i)
+	set sink [new Agent/TCPSink]
+	$ns attach-agent $n4 $sink
+	$ns connect $tcpCollection($i) $sink
+	$tcpCollection($i) set fid_ 2
+	$tcpCollection($i) set window_ 80
+
+	set ftpCollection($i) [new Application/FTP]
+	$ftpCollection($i) attach-agent $tcpCollection($i)
+
+	# Dirty hops.
 	if {$i == 40} {
 		set startTime 10
 	}
@@ -101,10 +90,10 @@ for {set i 1} {$i <= 120} {incr i} {
 		set startTime 15
 	}
 	# and timing...
-	set increment getIntervalSize
-	set fileSize getPackageSize
+	set increment [$expoGenerator value]
+	set fileSize [$paretoGenerator value]
 	set startTime [expr $startTime + $increment]
-	$ns at startTime $startStringPrefix$i$startStringSuffix$fileSize
+	$ns at $startTime "$ftpCollection($i) send $fileSize"
 }
 
 set winfile [open WinFile w]
